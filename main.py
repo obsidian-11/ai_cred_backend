@@ -54,12 +54,12 @@ def analyze_urls(payload: URLList):
 
             credibility = score_credibility(ai_prob, url, content_type, text)
 
-
             record = {
                 "url": url,
                 "ai_probability": ai_prob,
                 "credibility_score": credibility["credibility_score"],
                 "reasoning": credibility["reasoning"],
+                "signals": credibility["signals"],
                 "content_type": content_type,
             }
 

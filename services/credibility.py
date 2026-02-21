@@ -1,5 +1,4 @@
 from urllib.parse import urlparse
-import math
 import numpy as np
 
 DOMAIN_TRUST = {
@@ -195,15 +194,6 @@ def burstiness(text: str) -> float:
     return float(min(cv / 0.8, 1.0))
 
 
-def bayesian_combine(signals: dict) -> float:
-    log_odds = 0.0
-    for s in signals.values():
-        s = max(0.01, min(0.99, s))
-        log_odds += 0.5 * math.log(s / (1 - s))
-    prob = 1 / (1 + math.exp(-log_odds))
-    return max(0.10, min(0.92, prob))
-
-
 def score_credibility(ai_prob: float, url: str, content_type: str = "blog", text: str = None):
     domain_trust = get_domain_trust(url)
     domain = urlparse(url).netloc.replace("www.", "")
@@ -212,23 +202,23 @@ def score_credibility(ai_prob: float, url: str, content_type: str = "blog", text
     type_weight = TYPE_WEIGHTS.get(content_type, 0.60)
 
     # Force high ai_prob for known low-trust/AI farm domains
-    # so the detector can't override domain knowledge
     if domain_trust <= 0.25:
         ai_prob = max(ai_prob, 0.90)
 
-    signals = {
-        "ai_detection": 1 - ai_prob,
-        "domain_trust": domain_trust,
-        "content_type": type_weight,
-        "length": min(len(text.split()) / 500, 1.0) if text else 0.5,
-        "burstiness": burstiness(text) if text else 0.5,
-    }
+    length = min(len(text.split()) / 500, 1.0) if text else 0.5
+    burst = burstiness(text) if text else 0.5
 
-    if domain_trust <= 0.25:
-        signals["source_penalty"] = 0.10
+    # Weighted average — domain trust is the dominant signal
+    score = (
+        (1 - ai_prob) * 35 +   # max 35pts
+        domain_trust  * 40 +   # max 40pts
+        type_weight   * 15 +   # max 15pts
+        length        * 5  +   # max 5pts
+        burst         * 5      # max 5pts
+    )
 
-    combined_prob = bayesian_combine(signals)
-    total = round(combined_prob * 100, 2)
+    # Hard cap at 88 — nothing is perfect
+    total = round(min(score, 88), 2)
 
     # Build reasoning
     reasons = []
@@ -260,7 +250,6 @@ def score_credibility(ai_prob: float, url: str, content_type: str = "blog", text
 
     if text:
         word_count = len(text.split())
-        burst = signals["burstiness"]
         if word_count >= 500:
             reasons.append(f"Substantive article length ({word_count} words)")
         elif word_count < 150:
@@ -273,5 +262,11 @@ def score_credibility(ai_prob: float, url: str, content_type: str = "blog", text
     return {
         "credibility_score": total,
         "reasoning": reasons,
-        "signals": {k: round(v, 3) for k, v in signals.items()},
+        "signals": {
+            "ai_detection": round(1 - ai_prob, 3),
+            "domain_trust": round(domain_trust, 3),
+            "content_type": round(type_weight, 3),
+            "length": round(length, 3),
+            "burstiness": round(burst, 3),
+        },
     }
