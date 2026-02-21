@@ -1,5 +1,6 @@
 # main.py
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from services.fetcher import fetch_page_text
 from services.ai_detector import detect_ai
@@ -9,6 +10,13 @@ from concurrent.futures import ThreadPoolExecutor
 import traceback
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class URLList(BaseModel):
     urls: list[str]
