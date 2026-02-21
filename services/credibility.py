@@ -83,8 +83,8 @@ def score_credibility(ai_prob: float, url: str, content_type: str = "blog", text
         burst         * 5      # max 5pts
     )
 
-    # Hard cap at 88 — nothing is perfect
-    total = round(min(score, 88), 2)
+    # Hard cap at 92 — nothing is perfect
+    total = round(min(score, 92), 2)
 
     # Build reasoning
     reasons = []
