@@ -104,17 +104,14 @@ def burstiness(text: str) -> float:
 
 
 def bayesian_combine(signals: dict) -> float:
-    """
-    Combines independent probability signals using log-odds Bayesian update.
-    Each signal is treated as P(credible | evidence).
-    Returns combined probability 0-1.
-    """
-    # Neutral prior: 50% credible before seeing any evidence
     log_odds = 0.0
-    for name, s in signals.items():
-        s = max(0.01, min(0.99, s))  # avoid log(0)
-        log_odds += math.log(s / (1 - s))
-    return 1 / (1 + math.exp(-log_odds))
+    for s in signals.values():
+        s = max(0.01, min(0.99, s))
+        # Dampen each signal's contribution to avoid compounding to extremes
+        log_odds += 0.5 * math.log(s / (1 - s))
+    prob = 1 / (1 + math.exp(-log_odds))
+    # Cap between 0.15 and 0.92 — nothing should ever be 100% credible
+    return max(0.15, min(0.92, prob))
 
 
 def score_credibility(ai_prob: float, url: str, content_type: str = "blog", text: str = None):
