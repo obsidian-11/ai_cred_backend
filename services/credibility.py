@@ -27,7 +27,7 @@ DOMAIN_TRUST = {
     "cnbc.com": 0.83,
     "cnn.com": 0.80,
     "foxnews.com": 0.65,
-    "thhill.com": 0.78,
+    "thehill.com": 0.78,
     "axios.com": 0.85,
     "vox.com": 0.80,
     "slate.com": 0.75,
@@ -145,11 +145,14 @@ TYPE_WEIGHTS = {
     "unknown": 0.60,
 }
 
-# Domains where content_type should be upgraded regardless of URL pattern
-RESEARCH_DOMAINS = {"arxiv.org", "pubmed.ncbi.nlm.nih.gov", "nature.com", "science.org",
-                    "nejm.org", "thelancet.com", "jamanetwork.com", "bmj.com", "plos.org"}
-NEWS_DOMAINS = {"nytimes.com", "theguardian.com", "bbc.com", "reuters.com", "apnews.com",
-                "washingtonpost.com", "bloomberg.com", "npr.org", "axios.com", "cnbc.com"}
+RESEARCH_DOMAINS = {
+    "arxiv.org", "pubmed.ncbi.nlm.nih.gov", "nature.com", "science.org",
+    "nejm.org", "thelancet.com", "jamanetwork.com", "bmj.com", "plos.org",
+}
+NEWS_DOMAINS = {
+    "nytimes.com", "theguardian.com", "bbc.com", "reuters.com", "apnews.com",
+    "washingtonpost.com", "bloomberg.com", "npr.org", "axios.com", "cnbc.com",
+}
 
 
 def get_domain_trust(url: str) -> float:
@@ -160,13 +163,12 @@ def get_domain_trust(url: str) -> float:
         for known_domain, trust in DOMAIN_TRUST.items():
             if domain.endswith(known_domain):
                 return trust
-        return 0.40  # unknown domains default to skeptical
+        return 0.40
     except Exception:
         return 0.40
 
 
 def get_content_type(url: str, hint: str = "blog") -> str:
-    """Upgrade content type based on domain knowledge."""
     try:
         domain = urlparse(url).netloc.replace("www.", "")
         if domain in RESEARCH_DOMAINS:
@@ -181,10 +183,6 @@ def get_content_type(url: str, hint: str = "blog") -> str:
 
 
 def burstiness(text: str) -> float:
-    """
-    Sentence length variance — humans vary more than AI.
-    Returns 0-1, higher = more human-like.
-    """
     sentences = [s.strip() for s in text.split('.') if len(s.strip().split()) > 2]
     if len(sentences) < 3:
         return 0.5
@@ -198,10 +196,6 @@ def burstiness(text: str) -> float:
 
 
 def bayesian_combine(signals: dict) -> float:
-    """
-    Log-odds Bayesian combination of independent signals.
-    Dampened to avoid extreme compounding.
-    """
     log_odds = 0.0
     for s in signals.values():
         s = max(0.01, min(0.99, s))
@@ -214,11 +208,14 @@ def score_credibility(ai_prob: float, url: str, content_type: str = "blog", text
     domain_trust = get_domain_trust(url)
     domain = urlparse(url).netloc.replace("www.", "")
 
-    # Upgrade content type based on domain knowledge
     content_type = get_content_type(url, content_type)
     type_weight = TYPE_WEIGHTS.get(content_type, 0.60)
 
-    # Signals
+    # Force high ai_prob for known low-trust/AI farm domains
+    # so the detector can't override domain knowledge
+    if domain_trust <= 0.25:
+        ai_prob = max(ai_prob, 0.90)
+
     signals = {
         "ai_detection": 1 - ai_prob,
         "domain_trust": domain_trust,
@@ -227,9 +224,8 @@ def score_credibility(ai_prob: float, url: str, content_type: str = "blog", text
         "burstiness": burstiness(text) if text else 0.5,
     }
 
-    # Penalty for known AI content farms
     if domain_trust <= 0.25:
-        signals["source_penalty"] = 0.15
+        signals["source_penalty"] = 0.10
 
     combined_prob = bayesian_combine(signals)
     total = round(combined_prob * 100, 2)
