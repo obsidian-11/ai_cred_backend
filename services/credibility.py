@@ -83,13 +83,51 @@ def get_domain_trust(url: str) -> float:
         return 0.6
 
 
-def score_credibility(ai_prob: float, url: str, content_type: str = "blog", text: str = None) -> float:
+def score_credibility(ai_prob: float, url: str, content_type: str = "blog", text: str = None):
     domain_trust = get_domain_trust(url)
-    type_score = TYPE_WEIGHTS.get(content_type, 0.7)
+    type_weight = TYPE_WEIGHTS.get(content_type, 0.7)
+    domain = urlparse(url).netloc.replace("www.", "")
 
-    ai_score     = (1 - ai_prob) * 40        # max 40pts
-    domain_score = domain_trust * 35          # max 35pts
-    type_score   = type_score * 15            # max 15pts
-    length_score = min(len(text.split()) / 500, 1.0) * 10 if text else 5  # max 10pts
+    ai_score     = (1 - ai_prob) * 40
+    domain_score = domain_trust * 35
+    type_score   = type_weight * 15
+    length_score = min(len(text.split()) / 500, 1.0) * 10 if text else 5
+    total = round(ai_score + domain_score + type_score + length_score, 2)
 
-    return round(ai_score + domain_score + type_score + length_score, 2)
+    # Build reasoning
+    reasons = []
+
+    if ai_prob > 0.65:
+        reasons.append(f"Content appears likely AI-generated ({round(ai_prob*100)}% probability)")
+    elif ai_prob < 0.35:
+        reasons.append(f"Content appears human-written ({round((1-ai_prob)*100)}% confidence)")
+    else:
+        reasons.append(f"AI authorship is uncertain ({round(ai_prob*100)}% AI probability)")
+
+    if domain_trust >= 0.90:
+        reasons.append(f"{domain} is a highly trusted source")
+    elif domain_trust >= 0.75:
+        reasons.append(f"{domain} has moderate-to-high domain trust")
+    elif domain_trust == 0.6:
+        reasons.append(f"{domain} is an unknown domain with no established trust score")
+    else:
+        reasons.append(f"{domain} has low domain trust ({round(domain_trust*100)}%)")
+
+    if content_type == "news":
+        reasons.append("News content carries higher credibility weight")
+    elif content_type == "blog":
+        reasons.append("Blog content carries lower credibility weight")
+    elif content_type == "research":
+        reasons.append("Research content carries high credibility weight")
+
+    if text:
+        word_count = len(text.split())
+        if word_count >= 500:
+            reasons.append(f"Substantive article length ({word_count} words)")
+        elif word_count < 150:
+            reasons.append(f"Short content may lack depth ({word_count} words)")
+
+    return {
+        "credibility_score": total,
+        "reasoning": reasons
+    }

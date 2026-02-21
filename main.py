@@ -54,12 +54,15 @@ def analyze_urls(payload: URLList):
 
             credibility = score_credibility(ai_prob, url, content_type, text)
 
+
             record = {
                 "url": url,
                 "ai_probability": ai_prob,
-                "credibility_score": credibility,
+                "credibility_score": credibility["credibility_score"],
+                "reasoning": credibility["reasoning"],
                 "content_type": content_type,
             }
+
             inserted = collection.insert_one(record)
             record["_id"] = str(inserted.inserted_id)
             print(f"[process_url] Done: {url} → ai_prob={ai_prob}, credibility={credibility}")
