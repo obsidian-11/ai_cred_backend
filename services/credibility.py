@@ -1,6 +1,6 @@
 from urllib.parse import urlparse
 import numpy as np
-from domain_trust import DOMAIN_TRUST
+from .domain_trust import DOMAIN_TRUST
 
 TYPE_WEIGHTS = {
     "news": 1.0,
