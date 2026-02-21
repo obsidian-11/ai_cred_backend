@@ -44,7 +44,7 @@ def analyze_urls(payload: URLList):
             elif any(domain in url for domain in ["news", "nytimes", "guardian"]):
                 content_type = "news"
 
-            credibility = score_credibility(ai_prob, 0.7, content_type)
+            credibility = score_credibility(ai_prob, url, content_type, text)
 
             record = {
                 "url": url,
